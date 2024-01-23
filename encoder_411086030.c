@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 typedef unsigned char uint8_t;
-
+#define PI 3.14159265359
 typedef struct _BMP_header 
 {
     char identifier[2]; // 0x0000
@@ -33,6 +33,13 @@ typedef struct RGB
     uint8_t B;
 } ImgRGB;
 
+typedef struct YCbCr
+{
+	float Y;
+	float Cb;
+	float Cr;
+} ImgYCbCr;
+
 /* structure for BMP file */
 typedef struct _BMP_file
 {
@@ -60,6 +67,10 @@ void usage(FILE *fp)
     return;
 }
 
+void RGBtoYCbCr(ImgRGB **RGB, ImgYCbCr **YCbCr);
+void DCT(ImgYCbCr  **data, float ****basis_vector, ImgYCbCr ****F);
+
+
 int demo0(char *fn_bmp, char *fn_R, char *fn_G, char *fn_B, char *fn_dim)
 {
     BMP_file bmp;
@@ -74,39 +85,7 @@ int demo0(char *fn_bmp, char *fn_R, char *fn_G, char *fn_B, char *fn_dim)
     return 1; //if return 1 means success product txt
 }
 
-void output_bmp(ImgRGB **RGB, FILE* outfile,  BMP_header bmpheader, int skip)
-{
-    char skip_buf[3] = { 0, 0, 0 };
-    int x, y;
-    fwrite(&bmpheader.identifier, sizeof(short), 1, outfile);
-    fwrite(&bmpheader.filesize, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.reserved, sizeof(short), 1, outfile);
-    fwrite(&bmpheader.reserved2, sizeof(short), 1, outfile);
-    fwrite(&bmpheader.bitmap_dataoffset, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.bitmap_headersize, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.width, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.height, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.planes, sizeof(short), 1, outfile);
-    fwrite(&bmpheader.bits_perpixel, sizeof(short), 1, outfile);
-    fwrite(&bmpheader.compression, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.bitmap_datasize, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.hresolution, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.vresolution, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.usedcolors, sizeof(int), 1, outfile);
-    fwrite(&bmpheader.importantcolors, sizeof(int), 1, outfile);
-
-    for (x = 0; x<bmpheader.height; x++)
-    {
-        for (y = 0; y<bmpheader.width; y++)
-        {    
-            fwrite(&RGB[x][y].B, sizeof(char), 1, outfile);
-            fwrite(&RGB[x][y].G, sizeof(char), 1, outfile);
-            fwrite(&RGB[x][y].R, sizeof(char), 1, outfile);  
-        }
-        if (skip != 0) { fwrite(skip_buf, skip, 1, outfile); }
-    }
-}
-
+int H,W;
 int main(int argc, char **argv)
 {
     int option = 0;// 0 for demo0, 1 for demo1, etc
@@ -123,14 +102,15 @@ int main(int argc, char **argv)
         case 0:
         demo0(argv[2], argv[3], argv[4], argv[5], argv[6]);
         break;
-        
+        // case 1:
+        // demo1(argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], argv[8], argv[9], argv[10], argv[11], argv[12]);
         default:
         break;
         // default statements
     }
     BMP_file p_bmp;
     
-    BMP_file_load_fn("Kimberly.bmp", &p_bmp);
+    BMP_file_load_fn("KimberlyNCat.bmp", &p_bmp);
    
     // FILE *output=fopen("ResKim.bmp","wb");                      //must have wb
     // output_bmp(RGB,  output, p_bmp.header,0);
@@ -273,4 +253,42 @@ int BMP_save_text(BMP_file *p_bmp, char *fn_R, char *fn_G, char *fn_B, char *fn_
     //Write the data in txt (4 txt) and record the R G B dim value
 }
 
+
+/*new*/
+void RGBtoYCbCr(ImgRGB **RGB, ImgYCbCr **YCbCr)
+{
+	for(int i = 0; i < H; i++)
+    {
+		for(int j = 0; j < W; j++)
+        {
+			YCbCr[i][j].Y = 0.299*RGB[i][j].R + 0.587*RGB[i][j].G + 0.114*RGB[i][j].B;
+			YCbCr[i][j].Cb = - 0.1689*RGB[i][j].R - 0.3313*RGB[i][j].G + 0.5*RGB[i][j].B +128;
+			YCbCr[i][j].Cr =  0.5*RGB[i][j].R - 0.4187*RGB[i][j].G - 0.081*RGB[i][j].B +128;
+		}
+	}
+}
+
+
+/*new*/
+void basis_8to8_vector(float ****basis_vector) //four dimension for u v r c
+{
+    const int size = 8;
+    const float factor = PI / (2 * size);
+
+    for (int u = 0; u < size; u++) 
+    {
+        for (int v = 0; v < size; v++) 
+        {
+            for (int r = size - 1; r >= 0; r--) 
+            {
+                for (int c = 0; c < size; c++) 
+                {
+                    float u_term = cos(factor * u * (2 * r + 1));
+                    float v_term = cos(factor * v * (2 * c + 1));
+                    basis_vector[u][v][r][c] = u_term * v_term;
+                }
+            }
+        }
+    }
+}
 

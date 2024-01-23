@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#define PI 3.14159265359
 typedef unsigned char uint8_t;
 
 typedef struct _BMP_header 
@@ -33,6 +34,11 @@ typedef struct RGB
     uint8_t B;
 } ImgRGB;
 
+typedef struct YCbCr{
+	float Y;
+	float Cb;
+	float Cr;
+} ImgYCbCr;
 
 /* structure for BMP file */
 typedef struct _BMP_file 
@@ -68,7 +74,7 @@ ImgRGB** malloc_2D(int row, int col)
     return Array;
 }
 
-
+int H,W;
 int main(int argc, char *argv[]) 
 {    
     if(strcmp(argv[1], "0") == 0)
@@ -96,6 +102,8 @@ void function0(char* argv2, char* argv3, char* argv4, char* argv5, char* argv6)
     fp_dim = fopen(argv6, "r");
 	//read "INPUT.bmp" to get the information of bmp header
 	    BMP_header bmpheader;
+        fscanf(fp_dim, "%d\n", &W);
+        fscanf(fp_dim, "%d\n", &H);
         bmpheader.identifier[0] = 'B';
         bmpheader.identifier[1] = 'M';
         bmpheader.filesize = 3296094; //3296040 //36578358
@@ -113,10 +121,8 @@ void function0(char* argv2, char* argv3, char* argv4, char* argv5, char* argv6)
         bmpheader.vresolution = 2835;
         bmpheader.usedcolors = 0;
         bmpheader.importantcolors = 0;
-      // bmpheader.palette = 1997860675;
        
-       fscanf(fp_dim, "%d\n", &W);
-       fscanf(fp_dim, "%d\n", &H);
+       
     ImgRGB **Data_RGB = malloc_2D(H, W);
     
 	for (int i = 0; i < H; i++)
@@ -168,5 +174,43 @@ void output_bmp(ImgRGB **RGB, FILE* outfile,  BMP_header bmpheader, int skip)
         }
         if (skip != 0) { fwrite(skip_buf, skip, 1, outfile); }
        
+    }
+}
+
+/*new*/
+void YCbCrtoRGB(ImgRGB **RGB, ImgYCbCr **YCbCr)    
+{
+	for(int i = 0; i < H; i++)
+    {
+		for(int j = 0; j < W; j++)
+        {
+			RGB[i][j].R = (uint8_t)YCbCr[i][j].Y + 1.402*(YCbCr[i][j].Cr - 128);
+			RGB[i][j].G = (uint8_t)YCbCr[i][j].Y - 0.344*(YCbCr[i][j].Cb - 128) - 0.714*(YCbCr[i][j].Cr - 128);
+			RGB[i][j].B = (uint8_t)YCbCr[i][j].Y + 1.772*(YCbCr[i][j].Cb - 128);
+		}
+	}
+}
+
+
+/*new*/
+void basis_8to8_vector(float ****basis_vector) //four dimension for u v r c
+{
+    const int size = 8;
+    const float factor = PI / (2 * size);
+
+    for (int u = 0; u < size; u++) 
+    {
+        for (int v = 0; v < size; v++) 
+        {
+            for (int r = size - 1; r >= 0; r--) 
+            {
+                for (int c = 0; c < size; c++) 
+                {
+                    float u_term = cos(factor * u * (2 * r + 1));
+                    float v_term = cos(factor * v * (2 * c + 1));
+                    basis_vector[u][v][r][c] = u_term * v_term;
+                }
+            }
+        }
     }
 }
